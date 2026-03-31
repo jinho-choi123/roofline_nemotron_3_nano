@@ -2,11 +2,13 @@
 
 Benchmark GPU behavior of `nvidia/Nemotron-H-8B-Base-8K` with Nsight Systems.
 The benchmark adds NVTX ranges for:
-- layer type (`Mamba`, `MLP`, `Attention`)
-- phase (`Prefill`, `Decode`)
+- module boundaries (`Mamba`, `MLP`, `Attention`)
 - inference call scope (`Inference/batch_N`)
 
-This makes it possible to inspect layer-level timing and phase behavior by batch size.
+This makes it possible to inspect layer-level timing and GPU activity by batch size while
+keeping Nsight reports small by default.
+
+**IMPORTANT: This benchmark only profiles the last decode step.**
 
 ## Model Overview
 
@@ -40,14 +42,13 @@ source .venv/bin/activate
 
 ## Quick Start
 
-Run the batch benchmark script:
+Run a quick sanity execution (no Nsight collection):
 
 ```bash
-./run_bench.sh
+uv run python bench.py --batch-size 1 --max-tokens 8 --warmup-runs 0
 ```
 
 Generated outputs:
-- Nsight reports: `nsys-reps/*.nsys-rep`
 - Application logs: `logs/benchmark_*.log`
 
 ## `bench.py` CLI
@@ -60,71 +61,59 @@ Options:
 - `--batch-size` (`int`, default: `4`)
 - `--max-tokens` (`int`, default: `100`)
 - `--warmup-runs` (`int`, default: `1`)
-- `--profile-start-step` (`int`, default: unset)
-- `--profile-end-step` (`int`, default: unset)
-
-### Step-range profiling window
-
-`--profile-start-step` and `--profile-end-step` limit profiling to a decode-step window:
-- decode step counting starts at `1` (first decode token)
-- `0` for start means "start from prefill"
-- end step is exclusive in practice: profiler stop is triggered when decode step reaches `--profile-end-step`
 
 Examples:
 
 ```bash
-# Profile the entire generate() call
+# Profile one run with Nsight Systems.
+# Capture starts automatically at the last decode step (step=max_tokens).
+mkdir -p nsys-reps
 nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop \
-  -t cuda,nvtx,osrt,cublas -o nsys-reps/full -f true \
-  uv run python bench.py --batch-size 4 --max-tokens 512
-
-# Long-context run, profile only decode steps 900..999
-nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop \
-  -t cuda,nvtx,osrt,cublas -o nsys-reps/long_ctx_window -f true \
-  uv run python bench.py --batch-size 4 --max-tokens 8000 \
-    --profile-start-step 900 --profile-end-step 1000
+  -t cuda,nvtx,osrt,cublas -o nsys-reps/nemotron_h_batch4_max512 -f true \
+  uv run python bench.py --batch-size 4 --max-tokens 512 --warmup-runs 1
 ```
 
-## `run_bench.sh` environment variables
-
-`run_bench.sh` reads configuration from env vars:
-
-- `MAX_TOKENS` (default in script)
-- `WARMUP_RUNS` (default in script)
-- `PROFILE_START_STEP` (optional)
-- `PROFILE_END_STEP` (optional)
-- `METRICS_FREQ` (kept for compatibility with optional GPU metrics variants)
-- `TRACE_TYPES` (default: `cuda,nvtx,osrt,cublas`)
-- `OUTPUT_PREFIX` (default: `nsys-reps/nemotron_h_batch`)
-
-Examples:
+Long-context example:
 
 ```bash
-# Basic run
-./run_bench.sh
-
-# Long context with small profiling window (smaller .nsys-rep)
-MAX_TOKENS=8000 PROFILE_START_STEP=900 PROFILE_END_STEP=1000 ./run_bench.sh
+mkdir -p nsys-reps
+nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop \
+  -t cuda,nvtx,osrt,cublas -o nsys-reps/nemotron_h_batch4_max2048 -f true \
+  uv run python bench.py --batch-size 4 --max-tokens 2048 --warmup-runs 1
 ```
+
+## Profiling Behavior
+
+- `bench.py` enables `cudaProfilerStart()` only at the last decode step.
+- Last decode step target is `max(1, max_tokens - 1)`.
+  - vLLM emits the first generated token in prefill, then decode runs for remaining tokens.
+- Warmup runs do not trigger profiling.
+- `cudaProfilerStop()` is called after `llm.generate()` returns.
+
+This usually reduces `.nsys-rep` size significantly compared with full-generation capture.
 
 ## NVTX Hierarchy
 
 During profiled execution, ranges are nested as:
 
 ```text
-Inference/batch_N[/profile_window_start_end]
-  Prefill/num_tokens=T
-    Mamba/layer_i
-    MLP/layer_j
-    Attention/layer_k
-  Decode/num_tokens=N
-    Mamba/layer_i
-    MLP/layer_j
-    Attention/layer_k
+Inference/batch_N
+  module=Mamba/layer=i
+  module=MLP/layer=j
+  module=Attention/layer=k
 ```
 
 This structure helps isolate:
-- prefill cost vs decode cost
-- per-layer behavior inside each phase
+- per-module behavior in the model forward path
 - batch-size effects across runs
+
+## Verify Capture Window
+
+```bash
+nsys stats --report nvtx_pushpop_sum nsys-reps/nemotron_h_batch4_max2048.nsys-rep
+```
+
+Check that:
+- `module=Mamba/layer=*`, `module=MLP/layer=*`, `module=Attention/layer=*` appear
+- timeline duration is concentrated near the final decode step
 
