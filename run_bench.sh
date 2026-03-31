@@ -2,14 +2,14 @@
 set -euo pipefail
 
 # readonly BATCH_SIZES=(1 2 4 8 16 32)
-readonly BATCH_SIZES=(1)
-readonly MAX_TOKENS="${MAX_TOKENS:-10000}"
+readonly BATCH_SIZES=(1 2)
+readonly MAX_TOKENS="${MAX_TOKENS:-10}"
 readonly WARMUP_RUNS="${WARMUP_RUNS:-1}"
 readonly METRICS_FREQ="${METRICS_FREQ:-10000}"
 readonly TRACE_TYPES="${TRACE_TYPES:-cuda,nvtx,osrt,cublas}"
 readonly OUTPUT_PREFIX="${OUTPUT_PREFIX:-nsys-reps/nemotron_h_batch}"
-readonly PROFILE_START_STEP="${PROFILE_START_STEP:-}"
-readonly PROFILE_END_STEP="${PROFILE_END_STEP:-}"
+readonly PROFILE_START_STEP="${PROFILE_START_STEP:-0}"
+readonly PROFILE_END_STEP="${PROFILE_END_STEP:-10}"
 
 mkdir -p logs nsys-reps
 
