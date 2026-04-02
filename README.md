@@ -34,7 +34,7 @@ It's recommended to use a GPU container for consistent environment and easy Nsig
 docker build -t hybrid-model-benchmark:cuda12.4 .docker/
 ```
 
-2. Run container with a single selected GPU, `SYS_ADMIN` capability, and project mount to `/workspace`:
+2. Run container with a single selected GPU, `SYS_ADMIN` capability, and project mount to `/workspace` inside the container:
 
 ```bash
 scripts/run_gpu_container.sh 0
@@ -44,65 +44,10 @@ scripts/run_gpu_container.sh 0
 - The project directory is mounted to `/workspace`.
 - The run command includes `--cap-add=SYS_ADMIN` for GPU performance counter/profiling use cases.
 
-Equivalent direct command:
-
-```bash
-docker run --rm -it \
-  --gpus "device=0" \
-  --cap-add=SYS_ADMIN \
-  -v "$(pwd):/workspace" \
-  -w /workspace \
-  hybrid-model-benchmark:cuda12.4 \
-  bash
-```
-
 Inside the container:
 
 ```bash
 uv sync
-scripts/run_batch4_max2048.sh
-```
-
-## Quick Start
-
-Run a quick sanity execution (no Nsight collection):
-
-```bash
-uv run python bench.py --batch-size 1 --max-tokens 8 --warmup-runs 0
-```
-
-Generated outputs:
-- Application logs: `logs/benchmark_*.log`
-
-## `bench.py` CLI
-
-```bash
-uv run python bench.py [options]
-```
-
-Options:
-- `--batch-size` (`int`, default: `4`)
-- `--max-tokens` (`int`, default: `100`)
-- `--warmup-runs` (`int`, default: `1`)
-
-Examples:
-
-```bash
-# Profile one run with Nsight Systems.
-# Capture starts automatically at the last decode step (step=max_tokens).
-mkdir -p nsys-reps
-nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop \
-  -t cuda,nvtx,osrt,cublas -o nsys-reps/nemotron_h_batch4_max512 -f true \
-  uv run python bench.py --batch-size 4 --max-tokens 512 --warmup-runs 1
-```
-
-Long-context example:
-
-```bash
-mkdir -p nsys-reps
-nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop \
-  -t cuda,nvtx,osrt,cublas -o nsys-reps/nemotron_h_batch4_max2048 -f true \
-  uv run python bench.py --batch-size 4 --max-tokens 2048 --warmup-runs 1
 ```
 
 ## Profiling Behavior
@@ -129,14 +74,3 @@ Inference/batch_N
 This structure helps isolate:
 - per-module behavior in the model forward path
 - batch-size effects across runs
-
-## Verify Capture Window
-
-```bash
-nsys stats --report nvtx_pushpop_sum nsys-reps/nemotron_h_batch4_max2048.nsys-rep
-```
-
-Check that:
-- `module=Mamba/layer=*`, `module=MLP/layer=*`, `module=Attention/layer=*` appear
-- timeline duration is concentrated near the final decode step
-
