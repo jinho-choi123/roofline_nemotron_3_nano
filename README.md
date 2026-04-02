@@ -37,7 +37,7 @@ docker build -t hybrid-model-benchmark:cuda12.4 .docker/
 2. Run container with a single selected GPU, `SYS_ADMIN` capability, and project mount to `/workspace` inside the container:
 
 ```bash
-scripts/run_gpu_container.sh 0
+scripts/generate_gpu_container.sh 0
 ```
 
 - The argument (`0`) is the GPU index to expose to the container.
@@ -70,27 +70,57 @@ nsys profile \
 uv run run_bench.py
 ```
 
-## Profiling Behavior
+## Run Full Benchmark Sweep
 
-- `bench.py` enables `cudaProfilerStart()` only at the last decode step.
-- Last decode step target is `max(1, max_tokens - 1)`.
-  - vLLM emits the first generated token in prefill, then decode runs for remaining tokens.
-- Warmup runs do not trigger profiling.
-- `cudaProfilerStop()` is called after `llm.generate()` returns.
+Use the helper script to run all benchmark combinations in one shot.
 
-This usually reduces `.nsys-rep` size significantly compared with full-generation capture.
+```bash
+chmod +x scripts/run_all_bench.sh
+./scripts/run_all_bench.sh
+```
+
+The script runs the following search space:
+
+- `batch_size`: `1, 2, 4, 8`
+- `prompt_length`: `1, 16, 256, 1024, 2048, 4096, 8000`
+- `warmup_iterations`: always `2`
+- `max_seq_length`: always `prompt_length + 2`
+
+Total runs: `4 x 7 = 28`
+
+For each run, it executes `uv run run_bench.py` with:
+
+- `BENCHMARK_BATCH_SIZE`
+- `BENCHMARK_PROMPT_LENGTH`
+- `BENCHMARK_WARMUP_ITERATIONS=2`
+- `BENCHMARK_MAX_SEQ_LENGTH=prompt_length+2`
+
+Each Nsight report is written to `nsys-reps/` with this naming pattern:
+
+```text
+benchmark_bs{batch_size}_pl{prompt_length}_ws2.nsys-rep
+```
+
+Failure behavior:
+
+- If one run fails, the script continues with the remaining runs.
+- At the end, it prints a failed-run summary.
+- Exit code is `1` when there is any failure, otherwise `0`.
 
 ## NVTX Hierarchy
 
 During profiled execution, ranges are nested as:
 
 ```text
-Inference/batch_N
-  module=Mamba/layer=i
-  module=MLP/layer=j
-  module=Attention/layer=k
+llm_generation
+  layer=i_module=Mamba
+  layer=i_module=MLP
+  layer=i_module=Attention
 ```
 
 This structure helps isolate:
 - per-module behavior in the model forward path
 - batch-size effects across runs
+
+## Benchmark Result Analysis
+- [Result analysis in 3090 GPU](./docs/3090_RESULT_ANALYSIS.md)
