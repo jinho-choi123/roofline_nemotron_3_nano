@@ -22,7 +22,7 @@ M-M-M-M*-M-M-M-M-M*-M-M-M-M-M*-M-M-M-M-M*-M-M-M-M-M-
 - `-`: MLP/FFN decoder layer
 - `*`: Attention decoder layer
 
-## Setup GPU Container
+## Setup GPU Container(Optional)
 
 It's recommended to use a GPU container for consistent environment and easy Nsight Systems use. 
 
@@ -48,6 +48,26 @@ Inside the container:
 
 ```bash
 uv sync
+```
+
+## Getting Started - Run the Benchmark
+1. Install dependencies:
+
+```bash
+uv sync
+```
+
+2. Run the benchmark with Nsight Systems:
+
+```bash
+nsys profile \
+--trace=cuda,nvtx,osrt,cublas \
+-o nsys-reps/benchmark_report \
+-f true \
+--capture-range=cudaProfilerApi \
+--capture-range-end=stop \
+-e BENCHMARK_BATCH_SIZE=4,BENCHMARK_MAX_SEQ_LENGTH=2048,BENCHMARK_WARMUP_ITERATIONS=1,BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
 ```
 
 ## Profiling Behavior

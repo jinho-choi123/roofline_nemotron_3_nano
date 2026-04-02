@@ -5,6 +5,7 @@ from typing import List
 from benchmarks.config import BenchmarkConfig
 
 from transformers import AutoTokenizer
+import torch
 
 
 def build_prompt(config: BenchmarkConfig) -> List[str]:
@@ -34,3 +35,31 @@ def get_layer_type(layer_token: str) -> str:
         return "Unknown"
 
     return layer_type_names[layer_token]
+
+
+def cuda_profiler_start() -> None:
+    """Start CUDA profiler range capture.
+
+    Returns:
+        None: No return value.
+
+    Raises:
+        RuntimeError: If the CUDA profiler start call fails.
+    """
+    status = torch.cuda.cudart().cudaProfilerStart()
+    if status != 0:
+        raise RuntimeError(f"cudaProfilerStart failed with status={status}")
+
+
+def cuda_profiler_stop() -> None:
+    """Stop CUDA profiler range capture.
+
+    Returns:
+        None: No return value.
+
+    Raises:
+        RuntimeError: If the CUDA profiler stop call fails.
+    """
+    status = torch.cuda.cudart().cudaProfilerStop()
+    if status != 0:
+        raise RuntimeError(f"cudaProfilerStop failed with status={status}")
