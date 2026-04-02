@@ -1,5 +1,3 @@
-logs/
-*.log
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,cuda
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,cuda

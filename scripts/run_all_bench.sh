@@ -4,6 +4,10 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPORT_DIR="${PROJECT_ROOT}/nsys-reps"
+LOG_DIR="${PROJECT_ROOT}/logs"
+
+timestamp="$(date +"%Y%m%d_%H%M%S")"
+LOG_FILE="${LOG_DIR}/run_all_bench_${timestamp}.log"
 
 BATCH_SIZES=(1 2 4 8)
 PROMPT_LENGTHS=(1 16 256 1024 2048 4096 8000)
@@ -14,6 +18,13 @@ CURRENT_RUN=0
 
 FAILED_RUNS=()
 
+mkdir -p "${REPORT_DIR}"
+mkdir -p "${LOG_DIR}"
+
+exec > >(tee -a "${LOG_FILE}") 2>&1
+
+echo "Logging to: ${LOG_FILE}"
+
 if ! command -v nsys >/dev/null 2>&1; then
 	echo "ERROR: nsys command not found. Please install Nsight Systems first." >&2
 	exit 1
@@ -23,8 +34,6 @@ if ! command -v uv >/dev/null 2>&1; then
 	echo "ERROR: uv command not found. Please install uv first." >&2
 	exit 1
 fi
-
-mkdir -p "${REPORT_DIR}"
 
 echo "Starting benchmark sweep: ${TOTAL_RUNS} runs"
 

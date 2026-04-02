@@ -2,13 +2,14 @@
 
 from functools import wraps
 
-from benchmarks.utils import get_layer_type
+from benchmarks.utils import get_layer_type, summarize_scheduler_output
 
 from typing import Any
 
 from vllm import LLM, SamplingParams
 import torch.nn as nn
 from vllm.v1.core.sched.scheduler import Scheduler
+from vllm.v1.core.sched.output import SchedulerOutput
 from loguru import logger
 
 
@@ -20,11 +21,15 @@ def monkey_patch_scheduler():
 
     @wraps(original_schedule)
     def logger_injected_schedule(*args, **kwargs):
-        # Add logging or other functionality here
+        scheduler_output: SchedulerOutput = original_schedule(*args, **kwargs)
 
-        scheduler_output = original_schedule(*args, **kwargs)
-        # Add logging or other functionality here
-        logger.info(f"Scheduler called with args: {args}, kwargs: {kwargs}")
+        summary = summarize_scheduler_output(scheduler_output)
+        logger.info("-" * 50)
+        logger.info("SchedulerOutput summary:")
+        for req_id, log in summary.items():
+            logger.info(f"req_id={req_id} {log}")
+        logger.info("-" * 50)
+
         return scheduler_output
 
     Scheduler.schedule = logger_injected_schedule

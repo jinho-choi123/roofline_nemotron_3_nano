@@ -1,10 +1,11 @@
 """Utility functions for benchmarks."""
 
-from typing import List
+from typing import Any, Dict, List
 
 from benchmarks.config import BenchmarkConfig
 
 from transformers import AutoTokenizer
+from vllm.v1.core.sched.output import SchedulerOutput
 import torch
 
 
@@ -63,3 +64,27 @@ def cuda_profiler_stop() -> None:
     status = torch.cuda.cudart().cudaProfilerStop()
     if status != 0:
         raise RuntimeError(f"cudaProfilerStop failed with status={status}")
+
+
+def summarize_scheduler_output(
+    scheduler_output: SchedulerOutput,
+) -> Dict[str, Any]:
+    """Summarize SchedulerOutput in a version-tolerant way for logging.
+
+    Args:
+        scheduler_output (Any): Output object returned by vLLM scheduler.
+
+    Returns:
+        Dict[str, Any]: Structured summary fields for logger consumption.
+    """
+    summary = {}
+    for req_id, num_scheduled_tokens in scheduler_output.num_scheduled_tokens.items():
+        if num_scheduled_tokens == 1:
+            # decode
+            summary[req_id] = "decode 1 token"
+
+        else:
+            # prefill
+            summary[req_id] = f"prefill {num_scheduled_tokens} tokens"
+
+    return summary
