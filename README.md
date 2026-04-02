@@ -22,22 +22,45 @@ M-M-M-M*-M-M-M-M-M*-M-M-M-M-M*-M-M-M-M-M*-M-M-M-M-M-
 - `-`: MLP/FFN decoder layer
 - `*`: Attention decoder layer
 
-## Prerequisites
+## Setup GPU Container
 
-- NVIDIA GPU with CUDA runtime available
-- Nsight Systems (`nsys`) installed
-- `uv` installed
-- Python dependencies installed via project lock
+It's recommended to use a GPU container for consistent environment and easy Nsight Systems use. 
 
-Reference installation guides:
-- Nsight Systems: [NVIDIA docs](https://docs.nvidia.com/nsight-systems/InstallationGuide/index.html#package-manager-installation)
-- uv: [Astral docs](https://docs.astral.sh/uv/getting-started/installation/)
+**IMPORTANT: The following steps assume you have sudo privileges in Bare Metal GPU Server.**
 
-## Setup
+1. Build image:
+
+```bash
+docker build -t hybrid-model-benchmark:cuda12.4 .docker/
+```
+
+2. Run container with a single selected GPU, `SYS_ADMIN` capability, and project mount to `/workspace`:
+
+```bash
+scripts/run_gpu_container.sh 0
+```
+
+- The argument (`0`) is the GPU index to expose to the container.
+- The project directory is mounted to `/workspace`.
+- The run command includes `--cap-add=SYS_ADMIN` for GPU performance counter/profiling use cases.
+
+Equivalent direct command:
+
+```bash
+docker run --rm -it \
+  --gpus "device=0" \
+  --cap-add=SYS_ADMIN \
+  -v "$(pwd):/workspace" \
+  -w /workspace \
+  hybrid-model-benchmark:cuda12.4 \
+  bash
+```
+
+Inside the container:
 
 ```bash
 uv sync
-source .venv/bin/activate
+scripts/run_batch4_max2048.sh
 ```
 
 ## Quick Start
