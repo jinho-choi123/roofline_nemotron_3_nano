@@ -3,11 +3,12 @@
 from typing import List
 from benchmarks.config import BenchmarkConfig
 from benchmarks.utils import build_prompt, cuda_profiler_start, cuda_profiler_stop
-from benchmarks.vllm_monkey_patch import monkey_patch_llm_engine
+from benchmarks.vllm_monkey_patch import monkey_patch_llm_engine, monkey_patch_scheduler
 from vllm import LLM, SamplingParams
 from loguru import logger
 import os
 import torch.cuda.nvtx as nvtx
+from vllm.v1.core.sched.scheduler import Scheduler
 
 
 def _setup_benchmark(config: BenchmarkConfig) -> tuple[List[str], LLM, SamplingParams]:
@@ -31,7 +32,10 @@ def _setup_benchmark(config: BenchmarkConfig) -> tuple[List[str], LLM, SamplingP
 
     # Warmup the llm engine
     logger.info("Warming up the LLM engine...")
-    llm.generate(prompt, SamplingParams(max_tokens=1))
+    llm.generate(prompt, SamplingParams(max_tokens=10))
+
+    # Monkey patch the scheduler to include logging
+    monkey_patch_scheduler()
 
     # Set up sampling parameters
     sampling_params = SamplingParams(

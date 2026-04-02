@@ -8,6 +8,27 @@ from typing import Any
 
 from vllm import LLM, SamplingParams
 import torch.nn as nn
+from vllm.v1.core.sched.scheduler import Scheduler
+from loguru import logger
+
+
+def monkey_patch_scheduler():
+    original_schedule = Scheduler.schedule
+    if getattr(Scheduler, "_logger_injected", False):
+        # The schedule method is already patched, skip patching to avoid double counting.
+        return
+
+    @wraps(original_schedule)
+    def logger_injected_schedule(*args, **kwargs):
+        # Add logging or other functionality here
+
+        scheduler_output = original_schedule(*args, **kwargs)
+        # Add logging or other functionality here
+        logger.info(f"Scheduler called with args: {args}, kwargs: {kwargs}")
+        return scheduler_output
+
+    Scheduler.schedule = logger_injected_schedule
+    setattr(Scheduler, "_logger_injected", True)
 
 
 def monkey_patch_llm_engine(llm: LLM):
