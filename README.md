@@ -44,38 +44,21 @@ scripts/generate_gpu_container.sh 0
 - The project directory is mounted to `/workspace`.
 - The run command includes `--cap-add=SYS_ADMIN` for GPU performance counter/profiling use cases.
 
-Inside the container:
-
-```bash
-uv sync
-```
-
-## Getting Started - Run the Benchmark
+## Getting Started - Run Full Benchmark Sweep
 1. Install dependencies:
 
 ```bash
 uv sync
 ```
 
-2. Run the benchmark with Nsight Systems:
-
+2. Install nsys cli tool:
 ```bash
-nsys profile \
---trace=cuda,nvtx,osrt,cublas \
--o nsys-reps/benchmark_report \
--f true \
---capture-range=cudaProfilerApi \
---capture-range-end=stop \
--e BENCHMARK_BATCH_SIZE=4,BENCHMARK_MAX_SEQ_LENGTH=2048,BENCHMARK_WARMUP_ITERATIONS=1,BENCHMARK_PROMPT_LENGTH=2046 \
-uv run run_bench.py
+./scripts/install_nsight_systems.sh
 ```
 
-## Run Full Benchmark Sweep
-
-Use the helper script to run all benchmark combinations in one shot.
+3. Run all the benchmarks with Nsight Systems:
 
 ```bash
-chmod +x scripts/run_all_bench.sh
 ./scripts/run_all_bench.sh
 ```
 
@@ -106,6 +89,22 @@ Failure behavior:
 - If one run fails, the script continues with the remaining runs.
 - At the end, it prints a failed-run summary.
 - Exit code is `1` when there is any failure, otherwise `0`.
+
+
+## Run Single Benchmark Configuration
+If you want to run a single benchmark configuration(instead of running a full sweep), set the environment variables and run the script directly:
+**Change <benchmark_report_name> with the desired report name**
+
+```bash
+nsys profile \
+--trace=cuda,nvtx,osrt,cublas \
+-o nsys-reps/<benchmark_report_name> \
+-f true \
+--capture-range=cudaProfilerApi \
+--capture-range-end=stop \
+-e BENCHMARK_BATCH_SIZE=4,BENCHMARK_MAX_SEQ_LENGTH=2048,BENCHMARK_WARMUP_ITERATIONS=1,BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
+```
 
 ## NVTX Hierarchy
 
