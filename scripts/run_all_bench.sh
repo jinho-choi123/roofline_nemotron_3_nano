@@ -8,9 +8,11 @@ LOG_DIR="${PROJECT_ROOT}/logs"
 
 timestamp="$(date +"%Y%m%d_%H%M%S")"
 LOG_FILE="${LOG_DIR}/run_all_bench_${timestamp}.log"
+RUN_ID="$(basename "${LOG_FILE}" .log)"
+RUN_REPORT_DIR="${REPORT_DIR}/${RUN_ID}"
 
 BATCH_SIZES=(1 2 4 8)
-PROMPT_LENGTHS=(1 16 256 1024 2048 4096 8000)
+PROMPT_LENGTHS=(1 16 256 1024 2048 4096 8180) # The max seq length is 8192, so we set the max prompt length to 8180 to avoid error.
 WARMUP_ITERATIONS=2
 
 TOTAL_RUNS=$((${#BATCH_SIZES[@]} * ${#PROMPT_LENGTHS[@]}))
@@ -20,6 +22,7 @@ FAILED_RUNS=()
 
 mkdir -p "${REPORT_DIR}"
 mkdir -p "${LOG_DIR}"
+mkdir -p "${RUN_REPORT_DIR}"
 
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
@@ -42,7 +45,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
 		CURRENT_RUN=$((CURRENT_RUN + 1))
 		max_seq_length=$((prompt_length + 2))
 
-		report_prefix="${REPORT_DIR}/benchmark_bs${batch_size}_pl${prompt_length}_ws${WARMUP_ITERATIONS}"
+		report_prefix="${RUN_REPORT_DIR}/benchmark_bs${batch_size}_pl${prompt_length}_ws${WARMUP_ITERATIONS}"
 
 		env_vars="BENCHMARK_BATCH_SIZE=${batch_size},BENCHMARK_MAX_SEQ_LENGTH=${max_seq_length},BENCHMARK_WARMUP_ITERATIONS=${WARMUP_ITERATIONS},BENCHMARK_PROMPT_LENGTH=${prompt_length}"
 

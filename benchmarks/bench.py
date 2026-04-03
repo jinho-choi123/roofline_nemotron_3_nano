@@ -25,7 +25,14 @@ def _setup_benchmark(config: BenchmarkConfig) -> tuple[List[str], LLM, SamplingP
     prompt = build_prompt(config)
 
     # Initialize the vLLM LLM instance
-    llm = LLM(model=config.model_name, trust_remote_code=True, enforce_eager=True)
+    llm = LLM(
+        model=config.model_name,
+        trust_remote_code=True,
+        enforce_eager=True,
+        max_num_batched_tokens=(
+            8192
+        ),  # Increase the max number of batched tokens in single "step()" to simplify the scheduling. OOM may happen if it is too large.
+    )
 
     # Monkey patch the LLM engine to include NVTX markers
     monkey_patch_llm_engine(llm)
