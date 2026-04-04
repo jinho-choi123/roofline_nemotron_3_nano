@@ -1,6 +1,6 @@
 # hybrid_model_benchmark
 
-Benchmark GPU behavior of `nvidia/Nemotron-H-8B-Base-8K` with Nsight Systems.
+Benchmark GPU behavior of `nvidia/NVIDIA-Nemotron-Nano-9B-v2` with Nsight Systems.
 The benchmark adds NVTX ranges for:
 - module boundaries (`Mamba`, `MLP`, `Attention`)
 - inference call scope (`Inference/batch_N`)
@@ -12,7 +12,7 @@ keeping Nsight reports small by default.
 
 ## Model Overview
 
-Nemotron-H is a hybrid stack with 52 layers and pattern:
+Nemotron-Nano-9B-v2 is a hybrid stack with 52 layers and pattern:
 
 ```text
 M-M-M-M*-M-M-M-M-M*-M-M-M-M-M*-M-M-M-M-M*-M-M-M-M-M-
@@ -65,7 +65,7 @@ uv sync
 The script runs the following search space:
 
 - `batch_size`: `1, 2, 4, 8`
-- `prompt_length`: `1, 16, 256, 1024, 2048, 4096, 8000`
+- `prompt_length`: `1, 16, 256, 1024, 2048, 4096, 8180`
 - `warmup_iterations`: always `2`
 - `max_seq_length`: always `prompt_length + 2`
 
@@ -78,10 +78,28 @@ For each run, it executes `uv run run_bench.py` with:
 - `BENCHMARK_WARMUP_ITERATIONS=2`
 - `BENCHMARK_MAX_SEQ_LENGTH=prompt_length+2`
 
-Each Nsight report is written to `nsys-reps/` with this naming pattern:
+Before the sweep starts, the script checks whether this command is supported:
+
+```bash
+nsys profile --gpu-metrics-devices=help
+```
+
+Mode selection:
+
+- `gm_all`: if `--gpu-metrics-devices=all` is supported, it is added to each `nsys profile` call.
+- `gm_none`: if not supported (or detection fails), profiling runs without that flag.
+
+Log files and report directories are mode-specific:
 
 ```text
-benchmark_bs{batch_size}_pl{prompt_length}_ws2.nsys-rep
+logs/run_all_bench_{gm_all|gm_none}_{timestamp}.log
+nsys-reps/run_all_bench_{gm_all|gm_none}_{timestamp}/
+```
+
+Each Nsight report is written with this naming pattern:
+
+```text
+benchmark_bs{batch_size}_pl{prompt_length}_ws2_{gm_all|gm_none}.nsys-rep
 ```
 
 Failure behavior:
@@ -96,6 +114,18 @@ If you want to run a single benchmark configuration(instead of running a full sw
 **Change <benchmark_report_name> with the desired report name**
 
 ```bash
+# profile with GPU metrics (if supported)
+nsys profile \
+--trace=cuda,nvtx,osrt,cublas \
+-o nsys-reps/<benchmark_report_name> \
+--gpu-metrics-devices=all \
+-f true \
+--capture-range=cudaProfilerApi \
+--capture-range-end=stop \
+-e BENCHMARK_BATCH_SIZE=4,BENCHMARK_MAX_SEQ_LENGTH=2048,BENCHMARK_WARMUP_ITERATIONS=1,BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
+
+# profile without GPU metrics
 nsys profile \
 --trace=cuda,nvtx,osrt,cublas \
 -o nsys-reps/<benchmark_report_name> \

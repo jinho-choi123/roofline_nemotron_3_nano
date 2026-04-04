@@ -34,7 +34,7 @@ class BenchmarkConfig:
 
     def __init__(
         self,
-        model_name: str = "nvidia/Nemotron-H-8B-Base-8K",
+        model_name: str = "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
         batch_size: int = 4,
         max_seq_length: int = 513,
         warmup_iterations: int = 3,

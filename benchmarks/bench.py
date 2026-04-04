@@ -29,8 +29,9 @@ def _setup_benchmark(config: BenchmarkConfig) -> tuple[List[str], LLM, SamplingP
         model=config.model_name,
         trust_remote_code=True,
         enforce_eager=True,
+        gpu_memory_utilization=0.95,  # Set high GPU memory utilization to maximize performance. Adjust if OOM occurs.
         max_num_batched_tokens=(
-            8192
+            4096
         ),  # Increase the max number of batched tokens in single "step()" to simplify the scheduling. OOM may happen if it is too large.
     )
 

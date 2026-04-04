@@ -64,6 +64,8 @@ def monkey_patch_llm_engine(llm: LLM):
                 f"Length of hybrid_layer_pattern ({len(hybrid_layer_pattern)}) does not match number of layers ({len(layers)})."
             )
 
+        num_layers = len(layers)
+
         # import torch's nvtx module here
         import torch.cuda.nvtx as worker_nvtx
 
@@ -87,11 +89,18 @@ def monkey_patch_llm_engine(llm: LLM):
             @wraps(original_forward)
             def nvtx_injected_forward(
                 *args: Any,
+                layer_idx=index,
                 _original_forward=original_forward,
                 _nvtx_marker_name=nvtx_marker_name,
                 **kwargs: Any,
             ) -> Any:
                 """A wrapper around the original forward method that includes NVTX markers."""
+                if layer_idx == 0:
+                    # Insert model forward start marker before the first layer's forward pass
+                    worker_nvtx.range_push("model_forward")
+                if layer_idx == num_layers - 1:
+                    # pop the "model_forward" marker
+                    worker_nvtx.range_pop()
 
                 worker_nvtx.range_push(_nvtx_marker_name)
                 try:

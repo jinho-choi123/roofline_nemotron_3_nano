@@ -1,66 +1,0 @@
-Logging to: /workspace/hybrid_model_benchmark/logs/run_all_bench_20260403_035036.log
-Starting benchmark sweep: 28 runs
-[1/28] Running batch_size=1, prompt_length=1, max_seq_length=3
-2026-04-03 03:50:44.204 | INFO     | benchmarks.config:__init__:72 - BenchmarkConfig initialized with: {'model_name': 'nvidia/Nemotron-H-8B-Base-8K', 'batch_size': 1, 'max_seq_length': 3, 'warmup_iterations': 2, 'prompt_length': 1}
-2026-04-03 03:50:44.204 | INFO     | benchmarks.bench:run_benchmark:58 - Running benchmark with configuration: {'model_name': 'nvidia/Nemotron-H-8B-Base-8K', 'batch_size': 1, 'max_seq_length': 3, 'warmup_iterations': 2, 'prompt_length': 1}
-2026-04-03 03:50:44.204 | INFO     | benchmarks.bench:_setup_benchmark:16 - Setting up benchmark with configuration: {'model_name': 'nvidia/Nemotron-H-8B-Base-8K', 'batch_size': 1, 'max_seq_length': 3, 'warmup_iterations': 2, 'prompt_length': 1}
-INFO 04-03 03:50:45 [utils.py:233] non-default args: {'trust_remote_code': True, 'max_num_batched_tokens': 8192, 'disable_log_stats': True, 'enforce_eager': True, 'model': 'nvidia/Nemotron-H-8B-Base-8K'}
-WARNING 04-03 03:50:45 [arg_utils.py:1352] The global random seed is set to 0. Since VLLM_ENABLE_V1_MULTIPROCESSING is set to False, this may affect the random state of the Python process that launched vLLM.
-INFO 04-03 03:50:46 [model.py:533] Resolved architecture: NemotronHForCausalLM
-INFO 04-03 03:50:46 [model.py:1582] Using max model len 8192
-INFO 04-03 03:50:46 [scheduler.py:231] Chunked prefill is enabled with max_num_batched_tokens=8192.
-INFO 04-03 03:50:46 [config.py:427] Updating mamba_ssm_cache_dtype to 'float16' for NemotronH model
-INFO 04-03 03:50:46 [config.py:212] Setting attention block size to 528 tokens to ensure that attention page size is >= mamba page size.
-INFO 04-03 03:50:46 [config.py:243] Padding mamba page size by 0.19% to ensure that mamba page size and attention page size are exactly equal.
-INFO 04-03 03:50:46 [vllm.py:754] Asynchronous scheduling is enabled.
-WARNING 04-03 03:50:46 [vllm.py:788] Enforce eager set, disabling torch.compile and CUDAGraphs. This is equivalent to setting -cc.mode=none -cc.cudagraph_mode=none
-WARNING 04-03 03:50:46 [vllm.py:799] Inductor compilation was disabled by user settings, optimizations settings that are only active during inductor compilation will be ignored.
-INFO 04-03 03:50:46 [vllm.py:964] Cudagraph is disabled under eager mode
-INFO 04-03 03:50:46 [compilation.py:289] Enabled custom fusions: norm_quant, act_quant
-INFO 04-03 03:50:47 [core.py:103] Initializing a V1 LLM engine (v0.18.0) with config: model='nvidia/Nemotron-H-8B-Base-8K', speculative_config=None, tokenizer='nvidia/Nemotron-H-8B-Base-8K', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=8192, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=0, served_model_name=nvidia/Nemotron-H-8B-Base-8K, enable_prefix_caching=False, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.NONE: 0>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['all'], 'splitting_ops': [], 'compile_mm_encoder': False, 'compile_sizes': [], 'compile_ranges_endpoints': [8192], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.NONE: 0>, 'cudagraph_num_of_warmups': 0, 'cudagraph_capture_sizes': [], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': True, 'fuse_act_quant': True, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False}, 'max_cudagraph_capture_size': 0, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': True, 'static_all_moe_layers': []}
-INFO 04-03 03:50:48 [parallel_state.py:1395] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://172.17.0.4:58893 backend=nccl
-INFO 04-03 03:50:48 [parallel_state.py:1717] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank N/A, EPLB rank N/A
-INFO 04-03 03:50:49 [gpu_model_runner.py:4481] Starting to load model nvidia/Nemotron-H-8B-Base-8K...
-INFO 04-03 03:50:49 [cuda.py:317] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
-INFO 04-03 03:50:49 [flash_attn.py:598] Using FlashAttention version 2
-Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
-Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:00<00:02,  1.33it/s]
-Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:01<00:01,  1.22it/s]
-Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:02<00:00,  1.21it/s]
-Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:02<00:00,  1.53it/s]
-Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:02<00:00,  1.41it/s]
-
-INFO 04-03 03:50:53 [default_loader.py:384] Loading weights took 2.90 seconds
-INFO 04-03 03:50:53 [gpu_model_runner.py:4566] Model loading took 15.11 GiB memory and 3.942033 seconds
-INFO 04-03 03:50:57 [gpu_worker.py:456] Available KV cache memory: 4.9 GiB
-INFO 04-03 03:50:57 [kv_cache_utils.py:1316] GPU KV cache size: 45,408 tokens
-INFO 04-03 03:50:57 [kv_cache_utils.py:1321] Maximum concurrency for 8,192 tokens per request: 27.64x
-INFO 04-03 03:50:57 [core.py:281] init engine (profile, create kv cache, warmup model) took 4.02 seconds
-INFO 04-03 03:50:59 [llm.py:391] Supported tasks: ('generate',)
-2026-04-03 03:50:59.326 | INFO     | benchmarks.bench:_setup_benchmark:41 - Warming up the LLM engine...
-Rendering prompts:   0%|          | 0/1 [00:00<?, ?it/s]Rendering prompts: 100%|██████████| 1/1 [00:00<00:00, 97.03it/s]
-Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]Processed prompts: 100%|██████████| 1/1 [00:06<00:00,  6.17s/it, est. speed input: 0.32 toks/s, output: 1.62 toks/s]Processed prompts: 100%|██████████| 1/1 [00:06<00:00,  6.17s/it, est. speed input: 0.32 toks/s, output: 1.62 toks/s]Processed prompts: 100%|██████████| 1/1 [00:06<00:00,  6.17s/it, est. speed input: 0.32 toks/s, output: 1.62 toks/s]
-2026-04-03 03:51:05.506 | INFO     | benchmarks.bench:run_benchmark:63 - Generating output from the LLM...
-Rendering prompts:   0%|          | 0/1 [00:00<?, ?it/s]Rendering prompts: 100%|██████████| 1/1 [00:00<00:00, 1107.55it/s]
-Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]2026-04-03 03:51:05.810 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:27 - --------------------------------------------------
-2026-04-03 03:51:05.810 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:28 - SchedulerOutput summary:
-2026-04-03 03:51:05.810 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:30 - req_id=1-a86131c0 prefill 2 tokens
-2026-04-03 03:51:05.810 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:31 - --------------------------------------------------
-2026-04-03 03:51:05.849 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:27 - --------------------------------------------------
-2026-04-03 03:51:05.850 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:28 - SchedulerOutput summary:
-2026-04-03 03:51:05.850 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:30 - req_id=1-a86131c0 decode 1 token
-2026-04-03 03:51:05.850 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:31 - --------------------------------------------------
-2026-04-03 03:51:05.876 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:27 - --------------------------------------------------
-2026-04-03 03:51:05.876 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:28 - SchedulerOutput summary:
-2026-04-03 03:51:05.876 | INFO     | benchmarks.vllm_monkey_patch:logger_injected_schedule:31 - --------------------------------------------------
-Processed prompts: 100%|██████████| 1/1 [00:00<00:00, 14.79it/s, est. speed input: 29.60 toks/s, output: 29.60 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00, 14.77it/s, est. speed input: 29.60 toks/s, output: 29.60 toks/s]
-Capture range started in the application.
-Capture range ended in the application.
-Generating '/tmp/nsys-root/nsys-report-6e60.qdstrm'
-[1/1] [0%                          ] benchmark_bs1_pl1_ws2.nsys-repProcessing events...
-[1/1] [0%                          ] benchmark_bs1_pl1_ws2.nsys-rep[1/1] [7%                          ] benchmark_bs1_pl1_ws2.nsys-rep[1/1] [14%                         ] benchmark_bs1_pl1_ws2.nsys-rep[1/1] [=========43%                ] benchmark_bs1_pl1_ws2.nsys-rep[1/1] [=========44%                ] benchmark_bs1_pl1_ws2.nsys-rep[1/1] [========================100%] benchmark_bs1_pl1_ws2.nsys-rep[1/1] [========================100%] benchmark_bs1_pl1_ws2.nsys-rep
-[rank0]:[W403 03:51:08.505166977 ProcessGroupNCCL.cpp:1553] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
-Generated:
-	/workspace/hybrid_model_benchmark/nsys-reps/run_all_bench_20260403_035036/benchmark_bs1_pl1_ws2.nsys-rep
-DONE: /workspace/hybrid_model_benchmark/nsys-reps/run_all_bench_20260403_035036/benchmark_bs1_pl1_ws2.nsys-rep
-[2/28] Running batch_size=1, prompt_length=16, max_seq_length=18
