@@ -1,16 +1,38 @@
 """Monkey patch the vllm Worker to inject NVTX range and enable cudaProfiling."""
 
 from functools import wraps
+import threading
 
 from benchmarks.utils import get_layer_type, summarize_scheduler_output
 
 from typing import Any
 
-from vllm import LLM, SamplingParams
-import torch.nn as nn
+from vllm import LLM
 from vllm.v1.core.sched.scheduler import Scheduler
 from vllm.v1.core.sched.output import SchedulerOutput
 from loguru import logger
+
+
+_thread_state = threading.local()
+
+
+def _infer_phase_marker(scheduler_output: SchedulerOutput) -> str:
+    """Infer phase marker name from scheduler output for single-request benchmarking."""
+    token_counts = list(scheduler_output.num_scheduled_tokens.values())
+    if not token_counts:
+        return "idle_phase"
+
+    # This benchmark is constrained to a single active request.
+    if len(token_counts) > 1:
+        raise RuntimeError(
+            f"Multiple active requests found in scheduler output: {token_counts}. This benchmark is designed for single-request scenarios."
+        )
+
+    return "decode_phase" if token_counts[0] == 1 else "prefill_phase"
+
+
+def _get_current_phase_marker() -> str:
+    return getattr(_thread_state, "phase_marker", "unknown_phase")
 
 
 def monkey_patch_scheduler():
@@ -20,19 +42,29 @@ def monkey_patch_scheduler():
         return
 
     @wraps(original_schedule)
-    def logger_injected_schedule(*args, **kwargs):
-        scheduler_output: SchedulerOutput = original_schedule(*args, **kwargs)
+    def logger_injected_schedule(self):
+        scheduler_output: SchedulerOutput = original_schedule(self)
+        phase_marker = _infer_phase_marker(scheduler_output)
+        _thread_state.phase_marker = phase_marker
 
         summary = summarize_scheduler_output(scheduler_output)
         logger.info("-" * 50)
         logger.info("SchedulerOutput summary:")
+
+        # This benchmark is designed to have only one request in-flight at a time, so there should be only one req_id in the summary.
+        assert len(summary.keys()) <= 1, (
+            "This benchmark is designed to have only one request in-flight at a time. Multiple req_id found in SchedulerOutput summary."
+        )
+
+        logger.info(f"phase_marker={phase_marker}")
+
         for req_id, log in summary.items():
             logger.info(f"req_id={req_id} {log}")
         logger.info("-" * 50)
 
         return scheduler_output
 
-    Scheduler.schedule = logger_injected_schedule
+    setattr(Scheduler, "schedule", logger_injected_schedule)
     setattr(Scheduler, "_logger_injected", True)
 
 
@@ -64,10 +96,29 @@ def monkey_patch_llm_engine(llm: LLM):
                 f"Length of hybrid_layer_pattern ({len(hybrid_layer_pattern)}) does not match number of layers ({len(layers)})."
             )
 
-        num_layers = len(layers)
-
         # import torch's nvtx module here
         import torch.cuda.nvtx as worker_nvtx
+
+        original_model_forward = model.forward
+        if not getattr(original_model_forward, "_phase_nvtx_injected", False):
+
+            @wraps(original_model_forward)
+            def phase_wrapped_model_forward(
+                *args: Any,
+                _original_model_forward=original_model_forward,
+                **kwargs: Any,
+            ) -> Any:
+                phase_marker = _get_current_phase_marker()
+                worker_nvtx.range_push(phase_marker)
+                worker_nvtx.range_push("model_forward")
+                try:
+                    return _original_model_forward(*args, **kwargs)
+                finally:
+                    worker_nvtx.range_pop()
+                    worker_nvtx.range_pop()
+
+            setattr(phase_wrapped_model_forward, "_phase_nvtx_injected", True)
+            model.forward = phase_wrapped_model_forward
 
         # Iterate through the layers and patch their forward methods to include NVTX markers
         for index, layer in enumerate(layers):
@@ -89,19 +140,11 @@ def monkey_patch_llm_engine(llm: LLM):
             @wraps(original_forward)
             def nvtx_injected_forward(
                 *args: Any,
-                layer_idx=index,
                 _original_forward=original_forward,
                 _nvtx_marker_name=nvtx_marker_name,
                 **kwargs: Any,
             ) -> Any:
                 """A wrapper around the original forward method that includes NVTX markers."""
-                if layer_idx == 0:
-                    # Insert model forward start marker before the first layer's forward pass
-                    worker_nvtx.range_push("model_forward")
-                if layer_idx == num_layers - 1:
-                    # pop the "model_forward" marker
-                    worker_nvtx.range_pop()
-
                 worker_nvtx.range_push(_nvtx_marker_name)
                 try:
                     output = _original_forward(*args, **kwargs)

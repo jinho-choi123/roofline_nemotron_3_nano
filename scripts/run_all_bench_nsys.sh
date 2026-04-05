@@ -12,8 +12,8 @@ GPU_METRICS_FLAG=()
 gpu_metrics_help_status=1
 gpu_metrics_help_output=""
 
-BATCH_SIZES=(1 2)
-PROMPT_LENGTHS=(1 16 256 1024 2048 4096 8192 16384 32768 65536)
+BATCH_SIZES=(1)
+PROMPT_LENGTHS=(8 16 256 1024 2048 4096 8192 16384 32768 65536 131072)
 WARMUP_ITERATIONS=2
 
 TOTAL_RUNS=$((${#BATCH_SIZES[@]} * ${#PROMPT_LENGTHS[@]}))
@@ -43,7 +43,7 @@ if [[ ${gpu_metrics_help_status} -eq 0 ]] \
 	GPU_METRICS_FLAG=(--gpu-metrics-devices=all)
 fi
 
-LOG_FILE="${LOG_DIR}/run_all_bench_${PROFILE_MODE}_${timestamp}.log"
+LOG_FILE="${LOG_DIR}/run_all_bench_${PROFILE_MODE}_${timestamp}_nsys.log"
 RUN_ID="$(basename "${LOG_FILE}" .log)"
 RUN_REPORT_DIR="${REPORT_DIR}/${RUN_ID}"
 
@@ -74,7 +74,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
 		CURRENT_RUN=$((CURRENT_RUN + 1))
 		max_seq_length=$((prompt_length + 2))
 
-		report_prefix="${RUN_REPORT_DIR}/benchmark_bs${batch_size}_pl${prompt_length}_ws${WARMUP_ITERATIONS}_${PROFILE_MODE}"
+		report_prefix="${RUN_REPORT_DIR}/benchmark_bs${batch_size}_pl${prompt_length}_ws${WARMUP_ITERATIONS}_${PROFILE_MODE}_nsys"
 
 		env_vars="BENCHMARK_BATCH_SIZE=${batch_size},BENCHMARK_MAX_SEQ_LENGTH=${max_seq_length},BENCHMARK_WARMUP_ITERATIONS=${WARMUP_ITERATIONS},BENCHMARK_PROMPT_LENGTH=${prompt_length}"
 
