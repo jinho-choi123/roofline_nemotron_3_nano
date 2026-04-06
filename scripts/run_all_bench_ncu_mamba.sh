@@ -9,11 +9,12 @@ LOG_DIR="${PROJECT_ROOT}/logs"
 timestamp="$(date +"%Y%m%d_%H%M%S")"
 
 BATCH_SIZES=(1)
-PROMPT_LENGTHS=(8 16 256 1024 2048 4096 8192 16384 32768 65536 131072)
+PROMPT_LENGTHS=(4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 65536 131072)
 WARMUP_ITERATIONS=2
 
 NCU_SET="${NCU_SET:-full}"
 NCU_REPLAY_MODE="${NCU_REPLAY_MODE:-kernel}"
+NCU_PREFILL_RANGE_FILTER="${NCU_PREFILL_RANGE_FILTER:-:1:1}"
 
 NCU_PHASE_MODES=("prefill" "decode")
 TARGET_LAYER_NVTX_MARKER="layer=16_module=Mamba"
@@ -56,6 +57,7 @@ echo "Logging to: ${LOG_FILE}"
 echo "Target marker: ${TARGET_LAYER_NVTX_MARKER}"
 echo "NCU set: ${NCU_SET}"
 echo "NCU replay mode: ${NCU_REPLAY_MODE}"
+echo "NCU prefill range filter (first prefill only): ${NCU_PREFILL_RANGE_FILTER}"
 echo "NCU phase modes: ${NCU_PHASE_MODES[*]}"
 echo "NVTX include ranges by phase:"
 for phase_mode in "${NCU_PHASE_MODES[@]}"; do
@@ -74,6 +76,10 @@ for phase_mode in "${NCU_PHASE_MODES[@]}"; do
 			CURRENT_RUN=$((CURRENT_RUN + 1))
 			max_seq_length=$((prompt_length + 2))
 			include="llm_generation/${phase_mode}_phase/model_forward/${TARGET_LAYER_NVTX_MARKER}"
+			prefill_range_filter=""
+			if [[ "${phase_mode}" == "prefill" ]]; then
+				prefill_range_filter="${NCU_PREFILL_RANGE_FILTER}"
+			fi
 
 			report_prefix="${RUN_REPORT_DIR}/benchmark_${TARGET_NAME}_bs${batch_size}_pl${prompt_length}_ws${WARMUP_ITERATIONS}_${phase_mode}_phase_mamba"
 
@@ -87,6 +93,13 @@ for phase_mode in "${NCU_PHASE_MODES[@]}"; do
 				--replay-mode "${NCU_REPLAY_MODE}"
 				--nvtx
 				--nvtx-include "${include}"
+			)
+
+			if [[ -n "${prefill_range_filter}" ]]; then
+				ncu_cmd+=(--range-filter "${prefill_range_filter}")
+			fi
+
+			ncu_cmd+=(
 				env
 				"BENCHMARK_BATCH_SIZE=${batch_size}"
 				"BENCHMARK_MAX_SEQ_LENGTH=${max_seq_length}"

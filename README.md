@@ -51,68 +51,32 @@ scripts/generate_gpu_container.sh 0
 uv sync
 ```
 
-2. Install nsys cli tool:
+2. Install nsys and ncu cli tool:
 ```bash
 ./scripts/install_nsight_systems.sh
+./scripts/install_nsight_compute.sh
 ```
 
-3. Run all the benchmarks with Nsight Systems:
+3. Run all the benchmarks with Nsight Systems and Nsight Compute:
 
 ```bash
-./scripts/run_all_bench.sh
+./scripts/run_all_bench_nsys.sh ; ./scripts/run_all_bench_ncu_attention.sh ; ./scripts/run_all_bench_ncu_mlp.sh ; ./scripts/run_all_bench_ncu_mamba.sh
 ```
 
 The script runs the following search space:
 
-- `batch_size`: `1, 2, 4, 8`
-- `prompt_length`: `1, 16, 256, 1024, 2048, 4096, 8180`
+- `batch_size`: `1` # Only single batch size
+- `prompt_length`: `4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072`
 - `warmup_iterations`: always `2`
 - `max_seq_length`: always `prompt_length + 2`
 
-Total runs: `4 x 7 = 28`
-
-For each run, it executes `uv run run_bench.py` with:
-
-- `BENCHMARK_BATCH_SIZE`
-- `BENCHMARK_PROMPT_LENGTH`
-- `BENCHMARK_WARMUP_ITERATIONS=2`
-- `BENCHMARK_MAX_SEQ_LENGTH=prompt_length+2`
-
-Before the sweep starts, the script checks whether this command is supported:
-
-```bash
-nsys profile --gpu-metrics-devices=help
-```
-
-Mode selection:
-
-- `gm_all`: if `--gpu-metrics-devices=all` is supported, it is added to each `nsys profile` call.
-- `gm_none`: if not supported (or detection fails), profiling runs without that flag.
-
-Log files and report directories are mode-specific:
-
-```text
-logs/run_all_bench_{gm_all|gm_none}_{timestamp}.log
-nsys-reps/run_all_bench_{gm_all|gm_none}_{timestamp}/
-```
-
-Each Nsight report is written with this naming pattern:
-
-```text
-benchmark_bs{batch_size}_pl{prompt_length}_ws2_{gm_all|gm_none}.nsys-rep
-```
-
-Failure behavior:
-
-- If one run fails, the script continues with the remaining runs.
-- At the end, it prints a failed-run summary.
-- Exit code is `1` when there is any failure, otherwise `0`.
-
+Total runs: `1 x 16 = 16`
 
 ## Run Single Benchmark Configuration
 If you want to run a single benchmark configuration(instead of running a full sweep), set the environment variables and run the script directly:
 **Change <benchmark_report_name> with the desired report name**
 
+### Nsight Systems profiling
 ```bash
 # profile with GPU metrics (if supported)
 nsys profile \
@@ -136,20 +100,104 @@ nsys profile \
 uv run run_bench.py
 ```
 
+### Nsight Compute profiling
+
+```bash
+# 1) Attention prefill (first matched prefill range only)
+ncu \
+-o ncu-reps/<benchmark_report_name>_attention_prefill \
+-f \
+--set full \
+--replay-mode kernel \
+--nvtx \
+--nvtx-include "llm_generation/prefill_phase/model_forward/layer=17_module=Attention" \
+--range-filter ":1:1" \
+env BENCHMARK_BATCH_SIZE=1 BENCHMARK_MAX_SEQ_LENGTH=2048 BENCHMARK_WARMUP_ITERATIONS=2 BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
+
+# 2) Attention decode
+ncu \
+-o ncu-reps/<benchmark_report_name>_attention_decode \
+-f \
+--set full \
+--replay-mode kernel \
+--nvtx \
+--nvtx-include "llm_generation/decode_phase/model_forward/layer=17_module=Attention" \
+env BENCHMARK_BATCH_SIZE=1 BENCHMARK_MAX_SEQ_LENGTH=2048 BENCHMARK_WARMUP_ITERATIONS=2 BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
+
+# 3) MLP prefill (first matched prefill range only)
+ncu \
+-o ncu-reps/<benchmark_report_name>_mlp_prefill \
+-f \
+--set full \
+--replay-mode kernel \
+--nvtx \
+--nvtx-include "llm_generation/prefill_phase/model_forward/layer=18_module=MLP" \
+--range-filter ":1:1" \
+env BENCHMARK_BATCH_SIZE=1 BENCHMARK_MAX_SEQ_LENGTH=2048 BENCHMARK_WARMUP_ITERATIONS=2 BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
+
+# 4) MLP decode
+ncu \
+-o ncu-reps/<benchmark_report_name>_mlp_decode \
+-f \
+--set full \
+--replay-mode kernel \
+--nvtx \
+--nvtx-include "llm_generation/decode_phase/model_forward/layer=18_module=MLP" \
+env BENCHMARK_BATCH_SIZE=1 BENCHMARK_MAX_SEQ_LENGTH=2048 BENCHMARK_WARMUP_ITERATIONS=2 BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
+
+# 5) Mamba prefill (first matched prefill range only)
+ncu \
+-o ncu-reps/<benchmark_report_name>_mamba_prefill \
+-f \
+--set full \
+--replay-mode kernel \
+--nvtx \
+--nvtx-include "llm_generation/prefill_phase/model_forward/layer=16_module=Mamba" \
+--range-filter ":1:1" \
+env BENCHMARK_BATCH_SIZE=1 BENCHMARK_MAX_SEQ_LENGTH=2048 BENCHMARK_WARMUP_ITERATIONS=2 BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
+
+# 6) Mamba decode
+ncu \
+-o ncu-reps/<benchmark_report_name>_mamba_decode \
+-f \
+--set full \
+--replay-mode kernel \
+--nvtx \
+--nvtx-include "llm_generation/decode_phase/model_forward/layer=16_module=Mamba" \
+env BENCHMARK_BATCH_SIZE=1 BENCHMARK_MAX_SEQ_LENGTH=2048 BENCHMARK_WARMUP_ITERATIONS=2 BENCHMARK_PROMPT_LENGTH=2046 \
+uv run run_bench.py
+```
+
+- For `prefill`, `--range-filter ":1:1"` keeps only the first matched prefill NVTX range.
+- For `decode`, do not pass `--range-filter`.
+- Keep `BENCHMARK_MAX_SEQ_LENGTH = BENCHMARK_PROMPT_LENGTH + 2`.
+
+
 ## NVTX Hierarchy
 
 During profiled execution, ranges are nested as:
 
 ```text
 llm_generation
-  layer=i_module=Mamba
-  layer=i_module=MLP
-  layer=i_module=Attention
+  prefill_phase | decode_phase
+    model_forward
+      layer=i_module=Mamba
+      layer=i_module=MLP
+      layer=i_module=Attention
 ```
 
 This structure helps isolate:
 - per-module behavior in the model forward path
-- batch-size effects across runs
+- phase-specific behavior (`prefill` vs `decode`)
+
+Notes:
+- In long-context prefill, the same `layer=i_module=*` marker can appear multiple times.
+- Nsight Compute filtering in this repo targets: `llm_generation/<phase>_phase/model_forward/layer=...`.
 
 ## Benchmark Result Analysis
 - [Result analysis in 3090 GPU](./docs/3090_RESULT_ANALYSIS.md)
