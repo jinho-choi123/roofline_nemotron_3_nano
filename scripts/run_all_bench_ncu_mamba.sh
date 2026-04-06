@@ -12,8 +12,9 @@ BATCH_SIZES=(1)
 PROMPT_LENGTHS=(4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 65536 131072)
 WARMUP_ITERATIONS=2
 
-NCU_SET="${NCU_SET:-full}"
-NCU_REPLAY_MODE="${NCU_REPLAY_MODE:-kernel}"
+NCU_SECTIONS_RAW="${NCU_SECTIONS:-SpeedOfLight WarpStateStats MemoryWorkloadAnalysis ComputeWorkloadAnalysis}"
+read -r -a NCU_SECTIONS <<< "${NCU_SECTIONS_RAW}"
+NCU_REPLAY_MODE="${NCU_REPLAY_MODE:-app-range}"
 NCU_PREFILL_RANGE_FILTER="${NCU_PREFILL_RANGE_FILTER:-:1:1}"
 
 NCU_PHASE_MODES=("prefill" "decode")
@@ -26,6 +27,11 @@ for phase_mode in "${NCU_PHASE_MODES[@]}"; do
 		exit 1
 	fi
 done
+
+if ((${#NCU_SECTIONS[@]} == 0)); then
+	echo "ERROR: NCU_SECTIONS must include at least one section name." >&2
+	exit 1
+fi
 
 TOTAL_RUNS_PER_PHASE=$((${#BATCH_SIZES[@]} * ${#PROMPT_LENGTHS[@]}))
 TOTAL_RUNS=$((TOTAL_RUNS_PER_PHASE * ${#NCU_PHASE_MODES[@]}))
@@ -55,13 +61,13 @@ exec > >(tee -a "${LOG_FILE}") 2>&1
 
 echo "Logging to: ${LOG_FILE}"
 echo "Target marker: ${TARGET_LAYER_NVTX_MARKER}"
-echo "NCU set: ${NCU_SET}"
+echo "NCU sections: ${NCU_SECTIONS[*]}"
 echo "NCU replay mode: ${NCU_REPLAY_MODE}"
 echo "NCU prefill range filter (first prefill only): ${NCU_PREFILL_RANGE_FILTER}"
 echo "NCU phase modes: ${NCU_PHASE_MODES[*]}"
 echo "NVTX include ranges by phase:"
 for phase_mode in "${NCU_PHASE_MODES[@]}"; do
-	echo "  - llm_generation/${phase_mode}_phase/model_forward/${TARGET_LAYER_NVTX_MARKER}"
+	echo "  - ${phase_mode}_phase/model_forward/${TARGET_LAYER_NVTX_MARKER}"
 done
 echo "Starting benchmark sweep: ${TOTAL_RUNS} runs (${TOTAL_RUNS_PER_PHASE} per phase)"
 
@@ -75,7 +81,7 @@ for phase_mode in "${NCU_PHASE_MODES[@]}"; do
 		for prompt_length in "${PROMPT_LENGTHS[@]}"; do
 			CURRENT_RUN=$((CURRENT_RUN + 1))
 			max_seq_length=$((prompt_length + 2))
-			include="llm_generation/${phase_mode}_phase/model_forward/${TARGET_LAYER_NVTX_MARKER}"
+			include="${phase_mode}_phase/model_forward/${TARGET_LAYER_NVTX_MARKER}"
 			prefill_range_filter=""
 			if [[ "${phase_mode}" == "prefill" ]]; then
 				prefill_range_filter="${NCU_PREFILL_RANGE_FILTER}"
@@ -89,11 +95,14 @@ for phase_mode in "${NCU_PHASE_MODES[@]}"; do
 				ncu
 				-o "${report_prefix}"
 				-f
-				--set "${NCU_SET}"
 				--replay-mode "${NCU_REPLAY_MODE}"
 				--nvtx
 				--nvtx-include "${include}"
 			)
+
+			for ncu_section in "${NCU_SECTIONS[@]}"; do
+				ncu_cmd+=(--section "${ncu_section}")
+			done
 
 			if [[ -n "${prefill_range_filter}" ]]; then
 				ncu_cmd+=(--range-filter "${prefill_range_filter}")

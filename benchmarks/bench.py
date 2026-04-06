@@ -28,7 +28,9 @@ def _setup_benchmark(config: BenchmarkConfig) -> tuple[List[str], LLM, SamplingP
     llm = LLM(
         model=config.model_name,
         trust_remote_code=True,
-        enforce_eager=True,
+        # Since vllm's graph capture removes all the cpu operations,
+        # nvtx will be removed if enforce_eager is False.
+        enforce_eager=True,  # turn off torch graph compile.
         gpu_memory_utilization=0.95,  # Set high GPU memory utilization to maximize performance. Adjust if OOM occurs.
         max_num_batched_tokens=(
             4096
@@ -65,12 +67,10 @@ def run_benchmark(config: BenchmarkConfig):
 
     try:
         cuda_profiler_start()
-        nvtx.range_push("llm_generation")
 
         llm.generate(prompt, sampling_params)
     except Exception as e:
         logger.error(f"An error occurred during benchmark execution: {e}")
         raise
     finally:
-        nvtx.range_pop()
         cuda_profiler_stop()
