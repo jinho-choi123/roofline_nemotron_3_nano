@@ -1,5 +1,7 @@
 """Benchmark Configuration"""
 
+from typing import List
+
 from loguru import logger
 import os
 
@@ -25,12 +27,17 @@ class BenchmarkConfig:
     # number of tokens in the prompt for the benchmark
     prompt_length: int
 
+    # target_layer_ids
+    # 16: Mamba, 17: Attention, 18: MLP
+    profile_target_layer_ids: List[int]
+
     # Environment variable names for optional runtime overrides.
     ENV_MODEL_NAME = "BENCHMARK_MODEL_NAME"
     ENV_BATCH_SIZE = "BENCHMARK_BATCH_SIZE"
     ENV_MAX_SEQ_LENGTH = "BENCHMARK_MAX_SEQ_LENGTH"
     ENV_WARMUP_ITERATIONS = "BENCHMARK_WARMUP_ITERATIONS"
     ENV_PROMPT_LENGTH = "BENCHMARK_PROMPT_LENGTH"
+    ENV_PROFILE_TARGET_LAYER_IDS = "BENCHMARK_PROFILE_TARGET_LAYER_IDS"
 
     def __init__(
         self,
@@ -39,6 +46,7 @@ class BenchmarkConfig:
         max_seq_length: int = 513,
         warmup_iterations: int = 3,
         prompt_length: int = 512,
+        profile_target_layer_ids: List[int] = [16, 17, 18],
     ):
 
         env_model_name = os.getenv(self.ENV_MODEL_NAME)
@@ -46,6 +54,7 @@ class BenchmarkConfig:
         env_max_seq_length = os.getenv(self.ENV_MAX_SEQ_LENGTH)
         env_warmup_iterations = os.getenv(self.ENV_WARMUP_ITERATIONS)
         env_prompt_length = os.getenv(self.ENV_PROMPT_LENGTH)
+        env_profile_target_layer_ids = os.getenv(self.ENV_PROFILE_TARGET_LAYER_IDS)
 
         self.model_name = env_model_name if env_model_name is not None else model_name
         self.batch_size = (
@@ -63,6 +72,11 @@ class BenchmarkConfig:
         )
         self.prompt_length = (
             int(env_prompt_length) if env_prompt_length is not None else prompt_length
+        )
+        self.profile_target_layer_ids = (
+            [int(x) for x in env_profile_target_layer_ids.split(",")]
+            if env_profile_target_layer_ids is not None
+            else profile_target_layer_ids
         )
 
         assert self.max_seq_length > self.prompt_length, (

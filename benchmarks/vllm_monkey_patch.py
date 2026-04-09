@@ -1,9 +1,16 @@
 """Monkey patch the vllm Worker to inject NVTX range and enable cudaProfiling."""
 
+from benchmarks.config import BenchmarkConfig
+
 from functools import wraps
 import threading
 
-from benchmarks.utils import get_layer_type, summarize_scheduler_output
+from benchmarks.utils import (
+    get_layer_type,
+    summarize_scheduler_output,
+    cuda_profiler_start,
+    cuda_profiler_stop,
+)
 
 from typing import Any
 
@@ -11,9 +18,18 @@ from vllm import LLM
 from vllm.v1.core.sched.scheduler import Scheduler
 from vllm.v1.core.sched.output import SchedulerOutput
 from loguru import logger
+import torch
 
 
 _thread_state = threading.local()
+
+
+_PROFILED_PHASE_MARKERS = {"prefill_phase", "decode_phase"}
+_state_lock = threading.Lock()
+_state = {
+    "phase_marker": "unknown_phase",
+    "profiling_enabled": False,
+}
 
 
 def _infer_phase_marker(scheduler_output: SchedulerOutput) -> str:
@@ -32,7 +48,24 @@ def _infer_phase_marker(scheduler_output: SchedulerOutput) -> str:
 
 
 def _get_current_phase_marker() -> str:
-    return getattr(_thread_state, "phase_marker", "unknown_phase")
+    with _state_lock:
+        return _state["phase_marker"]
+
+
+def _set_current_phase_marker(phase_marker: str) -> None:
+    with _state_lock:
+        _state["phase_marker"] = phase_marker
+
+
+def set_profiling_enabled(enabled: bool) -> None:
+    """Enable or disable CUDA profiler API calls inside layer wrappers."""
+    with _state_lock:
+        _state["profiling_enabled"] = enabled
+
+
+def _is_profiling_enabled() -> bool:
+    with _state_lock:
+        return _state["profiling_enabled"]
 
 
 def monkey_patch_scheduler():
@@ -45,7 +78,7 @@ def monkey_patch_scheduler():
     def logger_injected_schedule(self):
         scheduler_output: SchedulerOutput = original_schedule(self)
         phase_marker = _infer_phase_marker(scheduler_output)
-        _thread_state.phase_marker = phase_marker
+        _set_current_phase_marker(phase_marker)
 
         summary = summarize_scheduler_output(scheduler_output)
         logger.info("-" * 50)
@@ -68,11 +101,12 @@ def monkey_patch_scheduler():
     setattr(Scheduler, "_logger_injected", True)
 
 
-def monkey_patch_llm_engine(llm: LLM):
+def monkey_patch_llm_engine(llm: LLM, bench_config: BenchmarkConfig):
     """Inject per-layer NVTX ranges into the model forward pass.
 
     Args:
         llm (LLM): Initialized vLLM LLM instance.
+        bench_config (BenchmarkConfig): Benchmark configuration instance.
 
     """
 
@@ -110,11 +144,10 @@ def monkey_patch_llm_engine(llm: LLM):
             ) -> Any:
                 phase_marker = _get_current_phase_marker()
                 worker_nvtx.range_push(phase_marker)
-                worker_nvtx.range_push("model_forward")
                 try:
                     return _original_model_forward(*args, **kwargs)
                 finally:
-                    worker_nvtx.range_pop()
+                    torch.cuda.synchronize()  # Ensure all CUDA operations are finished before popping the NVTX range to get accurate timing.
                     worker_nvtx.range_pop()
 
             setattr(phase_wrapped_model_forward, "_phase_nvtx_injected", True)
@@ -126,6 +159,21 @@ def monkey_patch_llm_engine(llm: LLM):
                 raise RuntimeError(f"Layer {index} does not have a forward method.")
 
             layer_type = get_layer_type(hybrid_layer_pattern[index])
+
+            is_profile_target_layer = (
+                True if index in bench_config.profile_target_layer_ids else False
+            )
+
+            # If the layer is not in the profile_target_layer_ids, we will not inject NVTX markers for it to save profiling overhead, and log this decision.
+            if not is_profile_target_layer:
+                logger.info(
+                    f"Layer {index} ({layer_type}) | NOT TARGET LAYER | no NVTX markers will be injected for this layer to save profiling overhead."
+                )
+                continue
+            else:
+                logger.info(
+                    f"Layer {index} ({layer_type}) | TARGET LAYER | it will be profiled with NVTX markers injected."
+                )
 
             nvtx_marker_name = f"layer={index}_module={layer_type}"
 
@@ -145,11 +193,29 @@ def monkey_patch_llm_engine(llm: LLM):
                 **kwargs: Any,
             ) -> Any:
                 """A wrapper around the original forward method that includes NVTX markers."""
-                worker_nvtx.range_push(_nvtx_marker_name)
+                phase_marker = _get_current_phase_marker()
+                should_capture = _is_profiling_enabled() and (
+                    phase_marker in _PROFILED_PHASE_MARKERS
+                )
+                profiler_started = False
                 try:
+                    if should_capture:
+                        logger.debug(
+                            f"Starting CUDA profiler for {_nvtx_marker_name} during {phase_marker}."
+                        )  # log when the profiler starts for better visibility in logs
+                        cuda_profiler_start()
+                        profiler_started = True
+                    worker_nvtx.range_push(_nvtx_marker_name)
+
                     output = _original_forward(*args, **kwargs)
                 finally:
+                    torch.cuda.synchronize()  # Ensure all CUDA operations are finished before popping the NVTX range to get accurate timing.
                     worker_nvtx.range_pop()
+                    if profiler_started:
+                        cuda_profiler_stop()
+                        logger.debug(
+                            f"Stopped CUDA profiler for {_nvtx_marker_name} during {phase_marker}."
+                        )  # log when the profiler stops for better visibility in logs
                 return output
 
             setattr(nvtx_injected_forward, "_nvtx_injected", True)

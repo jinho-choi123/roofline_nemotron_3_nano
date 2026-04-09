@@ -4,7 +4,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPORT_DIR="${PROJECT_ROOT}/nsys-reps"
-LOG_DIR="${PROJECT_ROOT}/logs"
+LOG_DIR="${PROJECT_ROOT}/nsys-logs"
 
 timestamp="$(date +"%Y%m%d_%H%M%S")"
 PROFILE_MODE="gm_none"
@@ -86,7 +86,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
 			-o "${report_prefix}"
 			-f true
 			--capture-range=cudaProfilerApi
-			--capture-range-end=stop
+			--capture-range-end=repeat
 		)
 
 		if [[ "${PROFILE_MODE}" == "gm_all" ]]; then

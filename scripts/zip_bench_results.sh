@@ -4,7 +4,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARCHIVE_FILE="${PROJECT_ROOT}/bench_results.zip"
-TARGET_DIRS=("nsys-reps" "ncu-reps" "logs")
+TARGET_DIRS=("nsys-reps" "ncu-reps" "nsys-logs" "ncu-logs")
 
 if ! command -v zip >/dev/null 2>&1; then
 	echo "ERROR: zip command not found. Please install zip first." >&2

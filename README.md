@@ -60,7 +60,7 @@ uv sync
 3. Run all the benchmarks with Nsight Systems and Nsight Compute:
 
 ```bash
-./scripts/run_all_bench_nsys.sh ; ./scripts/run_all_bench_ncu_attention.sh ; ./scripts/run_all_bench_ncu_mlp.sh ; ./scripts/run_all_bench_ncu_mamba.sh ; ./scripts/zip_bench_results.sh
+./scripts/run_all_bench_nsys.sh ; ./scripts/run_all_bench_ncu.sh ; ./scripts/zip_bench_results.sh
 ```
 
 The script runs the following search space:

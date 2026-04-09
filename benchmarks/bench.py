@@ -2,13 +2,15 @@
 
 from typing import List
 from benchmarks.config import BenchmarkConfig
-from benchmarks.utils import build_prompt, cuda_profiler_start, cuda_profiler_stop
-from benchmarks.vllm_monkey_patch import monkey_patch_llm_engine, monkey_patch_scheduler
+from benchmarks.utils import build_prompt
+from benchmarks.vllm_monkey_patch import (
+    monkey_patch_llm_engine,
+    monkey_patch_scheduler,
+    set_profiling_enabled,
+)
 from vllm import LLM, SamplingParams
 from loguru import logger
 import os
-import torch.cuda.nvtx as nvtx
-from vllm.v1.core.sched.scheduler import Scheduler
 
 
 def _setup_benchmark(config: BenchmarkConfig) -> tuple[List[str], LLM, SamplingParams]:
@@ -38,7 +40,10 @@ def _setup_benchmark(config: BenchmarkConfig) -> tuple[List[str], LLM, SamplingP
     )
 
     # Monkey patch the LLM engine to include NVTX markers
-    monkey_patch_llm_engine(llm)
+    monkey_patch_llm_engine(llm, config)
+
+    # Keep profiling off during warmup.
+    set_profiling_enabled(False)
 
     # Warmup the llm engine
     logger.info("Warming up the LLM engine...")
@@ -46,6 +51,9 @@ def _setup_benchmark(config: BenchmarkConfig) -> tuple[List[str], LLM, SamplingP
 
     # Monkey patch the scheduler to include logging
     monkey_patch_scheduler()
+
+    # Enable profiling for the measured run only.
+    set_profiling_enabled(True)
 
     # Set up sampling parameters
     sampling_params = SamplingParams(
@@ -66,11 +74,7 @@ def run_benchmark(config: BenchmarkConfig):
     logger.info("Generating output from the LLM...")
 
     try:
-        cuda_profiler_start()
-
         llm.generate(prompt, sampling_params)
     except Exception as e:
         logger.error(f"An error occurred during benchmark execution: {e}")
         raise
-    finally:
-        cuda_profiler_stop()

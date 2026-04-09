@@ -2,9 +2,11 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,cuda
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,cuda
 
-logs/
+*.zip
 nsys-reps
 ncu-reps
+ncu-logs
+nsys-logs
 
 ### CUDA ###
 *.i
